@@ -4,3 +4,5 @@
 由业务问题建模阶段产出。
 
 **约定输出**：`business_model.md`（Markdown）
+
+**产出文件**：[`business_model.md`](business_model.md)（✅ 2026-09-13 Draft；输入调研 / 竞品报告与仓库维护人需求收口 Q1–Q28）
