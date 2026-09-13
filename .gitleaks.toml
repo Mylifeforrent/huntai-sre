@@ -1,0 +1,12 @@
+# 项目级 gitleaks 规则：默认规则 + 本仓库允许清单
+# 文档：https://github.com/gitleaks/gitleaks
+title = "huntai-sre"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "文档模板与示例占位，不含真实密钥"
+paths = [
+  '''(^|/)\.env\.example$''',
+]
