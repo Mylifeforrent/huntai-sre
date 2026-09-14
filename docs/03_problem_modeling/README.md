@@ -5,4 +5,4 @@
 
 **约定输出**：`business_model.md`（Markdown）
 
-**产出文件**：[`business_model.md`](business_model.md)（✅ 2026-09-13 Draft；输入调研 / 竞品报告与仓库维护人需求收口 Q1–Q28）
+**产出文件**：[`business_model.md`](business_model.md)（✅ Draft；2026-09-13 一期收口 Q1–Q28；2026-09-14 增补二期 Q1–Q15）
