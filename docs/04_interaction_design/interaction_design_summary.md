@@ -114,7 +114,7 @@ Webhook 入库无登录用户界面：不提供「入库监控台」。失败表
 | PG-003 | 告警列表 | 按角色范围列出 Alert，定位 `cluster_id` + fingerprint | 已登录 | 不在列表上直接开调查；不 silence |
 | PG-004 | 深链未入库 | 深链参数合法但库中无该 Alert | 已登录且查找未命中 | 不伪造 Alert 卡片 |
 | PG-005 | 告警详情 | 一条 Alert；人工调查；RelatedLink；写「看过」。〔二期〕展示自动调查入口 | 对该 Alert 可见的用户 | 不 ack、不 page、不在本页执行 restart/scale |
-| PG-006 | 调查详情 | 一次 Investigation 的运行与终态。〔二期〕Loki citation、人批、继续查 | 能打开其所属 Alert 的用户；跨用户是否可看 **[TBD-BIZ]** | 不编辑 Claim；不把写执行当 Citation；无独立聊天 |
+| PG-006 | 调查详情 | 一次 Investigation 的运行与终态。〔二期〕Loki citation、人批、继续查 | 能打开其所属 Alert 的用户（含他人发起与 auto，BR-055） | 不编辑 Claim；不把写执行当 Citation；无独立聊天 |
 | PG-007 | 集群扫描 | 一期：SRE 选集群并发起按需扫描。〔二期〕兼 Finding 只读入口 | 一期仅 SRE/break-glass；二期开发只读 | 开发不可触发；无 namespace 扫描器 |
 | PG-008 | 扫描结果 | 一次 ScanRun 的 Finding 快照 | 有权看该次结果的人 | 无 Finding ack/close；不据此自动开调查 |
 | PG-009 | 数据源 | 2–5 个 ClusterSource；AM / Prom / 分析器。〔二期〕env 与写/Loki 凭证 | SRE / break-glass | 不上传 kubeconfig；不回显密钥明文 |
@@ -182,8 +182,8 @@ Webhook 入库无登录用户界面：不提供「入库监控台」。失败表
 
 | 层 | 信息 |
 |---|---|
-| L1 | 徽章 `running` / `completed` / `inconclusive` 必须可区分；`inconclusive` 主标题**禁止**「根因是…」。〔二期〕`trigger` 徽章；发起人为用户或「自动调查（不可登录）」 |
-| L2 | Skill：已加载 / **未加载组织约束**；成本闸 LLM n/8、工具 n/12（〔二期〕含 Loki 次数）、墙钟 ≤150s |
+| L1 | 徽章 `running` / `completed` / `inconclusive` 必须可区分；`inconclusive` 主标题**禁止**「根因是…」。〔二期〕`trigger` 徽章；发起人为用户或「自动调查（不可登录）」。**〔二期〕等人批**：工具/LLM 已停且有 pending ApprovalRequest 时，L1 固定为「只读调查已结束，等待确认写操作」，禁止「正在分析 / 正在调查」（BR-090） |
+| L2 | Skill：已加载 / **未加载组织约束**；成本闸 LLM n/8、工具 n/12（〔二期〕含 Loki 次数）、墙钟 ≤150s（等人批时墙钟暂停，显示「收集已停止」）。无 LLM 时横幅：「AI 不可用，本次只收集只读证据，不会生成根因结论」（BR-053） |
 | L3 | Claim + Citation；失败工具不可引用；RelatedLink 标「外部链接，不是证据」。〔二期〕Loki 成功结果可出现在 Citation；WriteAction 人批区（见下）；「继续查」输入绑定本 Investigation / 原 Alert |
 
 `completed`：主内容为 Claim + Citation。
@@ -251,7 +251,7 @@ Webhook 凭证如何展示 **[TBD-BIZ]**（BR-016）。
 |---|---|
 | L1 | 指定用户 +「临时放行今日调查额度」；「关闭新调查」 |
 | L2 | 每用户每日人工新建 ≤ 30。〔二期〕只读说明：自动开查不计入该 30 次 |
-| L3 | 组织日 token 未配置时必须显示「闸未配置，不得视为无限」。默认数字 **[TBD-BIZ]**。组织闸是否阻断 `trigger=auto` **[TBD-BIZ]**；未定前界面在关闸说明中写「是否含自动开查待确认」，禁止写死「无限自动」 |
+| L3 | 组织日 token 未配置时必须显示「闸未配置，不得视为无限」。默认数字 **[TBD-BIZ]**。关闸/未配置说明须写明：**同时阻断自动开查**（BR-042），禁止写「自动仍开」或「无限自动」 |
 
 ### 1.4 导航关系
 
@@ -365,7 +365,7 @@ flowchart LR
 | 步 | 用户操作 | 系统响应 | 页面变化 |
 |---|---|---|---|
 | 1 | 在可见 PG-005 点「调查」 | 确认层（IX-CNF-01）：占 1 次日额度、墙钟≤150s、只读 | PG-005 确认层 |
-| 2 | 确认 | 校验可见性、日额度、组织闸、**人点**并发（NFR-011）；创建 `trigger=human`、`running` | Submitting → PG-006 |
+| 2 | 确认 | 校验可见性、日额度、组织闸（不校验人点并发硬闸，BR-054）；创建 `trigger=human`、`running` | Submitting → PG-006 |
 | 3 | — | 拉 Skill；只读工具循环 | PG-006 Loading → Default（运行中） |
 
 〔二期〕同一 Alert 上已有 `trigger=auto` **不阻止**再开人工调查（一对多）。自动开查不占该用户 30 次（BR-073）。
@@ -375,10 +375,10 @@ flowchart LR
 | EX-05.1 | 不可见 | 点调查 | 拒绝；不落 running | PG-005 No Permission |
 | EX-05.2 | 当日人工新建已 30 | 确认 | 拒绝新开 | Success-Failure：「今日调查次数已用尽」。可说明需 SRE 在 PG-012 放行（无申请按钮） |
 | EX-05.3 | 组织关闭新调查，或闸未配置 fail-close | 确认 | 拒绝 | 「组织已关闭新调查」或「组织成本闸未配置」 |
-| EX-05.4 | 人点 `running` 已达一期 5（NFR-011；自动另计 NFR-017） | 确认 | 是否硬拒绝 **[TBD-BIZ]** | **[ASSUMPTION]** 拒绝：「同时进行的人工调查已达上限」 |
+| EX-05.4 | 人点 `running` 已达 NFR-011 规划值（一期 5） | 确认 | **不拒绝**（BR-054） | 正常进入 PG-006；不提示「已达上限」 |
 | EX-05.5 | 双击确认 | 连点 | IX-DUP-02 只创建一条 | 保持 Submitting |
-| EX-05.6 | 无 LLM / 禁出域 | 点「调查」 | 业务未规定禁用或只跑工具 | **[TBD-BIZ]**。未拍板：按钮仍在，拒绝则业务失败文案，不得声称已完成 RCA |
-| EX-05.7 | 创建接口失败 | 确认 | 不落成功调查 | PG-005 Error。额度是否在拒绝时占用 **[TBD-BIZ]** |
+| EX-05.6 | 无 LLM / 禁出域 | 点「调查」 | 仍创建；只跑只读工具；LLM=0（BR-053） | PG-006 横幅「AI 不可用，本次只收集只读证据，不会生成根因结论」；终态 `inconclusive`，不得声称已完成 RCA |
+| EX-05.7 | 创建接口失败 / 额度闸拒绝 | 确认 | 不落成功调查；**不占**当日次数（BR-041） | PG-005 Error 或 Success-Failure |
 
 ### TF-06 调查运行至可区分终态
 
@@ -388,8 +388,9 @@ flowchart LR
 |---|---|---|---|
 | 1 | 停留或稍后打开 PG-006 | 展示工具调用与成本闸 | PG-006 `running` Default |
 | 2 | 点 Citation | 打开本调查已成功只读 ToolCall 副本 | 只读证据层 |
-| 3 | — | citation≥1 且未触闸 → `completed` | L1 完成态 |
-| 4 | — | 否则 → `inconclusive` | L1 证据不足/成本闸；禁止「根因是…」 |
+| 3 | — | citation≥1 且未触闸 → `completed`（无 pending 人批时） | L1 完成态 |
+| 4 | — | 否则 → `inconclusive`（无 pending 人批时） | L1 证据不足/成本闸；禁止「根因是…」 |
+| 5 | 〔二期〕有 pending 人批 | 工具/LLM 已停 | 主状态仍 `running` | L1：「只读调查已结束，等待确认写操作」（BR-090） |
 
 `trigger=auto` 不得因无登录用户而跳过 citation 规则（§5.2）。
 
@@ -402,7 +403,7 @@ flowchart LR
 | EX-06.5 | 刷新/断网/关页 | 离开 | 服务端继续直至闸或结束。无「取消调查」BR | 再打开见当前状态。**[ASSUMPTION]** 不可取消 |
 | EX-06.6 | 输出超上下文 | — | 截断；Citation 指向截断副本（阈值 **[TBD-BIZ]**） | 证据标注「已截断」 |
 | EX-06.7 | 点 RelatedLink | 开外部 URL | 不写入 Citation | 标明不是证据 |
-| EX-06.8 | 90 天到期 | 打开旧 URL | 已删（BR-060） | Empty/Error：「调查已按保留策略删除」 |
+| EX-06.9 | 〔二期〕工具循环已停、仍有 pending | 打开 PG-006 | 保持 running；墙钟暂停 | L1 不得写「正在分析」。人批区可见 |
 
 PG-006 **无 Editing Claim**。〔二期〕人批确认不算改 Claim，见 TF-15。
 
@@ -506,7 +507,7 @@ host 允许列表 **[TBD-BIZ]**；未定前只做 URL 句法校验。
 | EX-12.1 | 未填数字却画成无限 | （设计禁令） | 违反 BR-042 | 禁止该状态 |
 | EX-12.2 | 误关闸 | 点开关 | 必须确认 | 未确认不改 |
 | EX-12.3 | 默认 token 数字 | — | **[TBD-BIZ]** | 可空；空 = 未配置，新调查 fail-close |
-| EX-12.4 | 〔二期〕关闸后 automatic 开查 | — | 是否跳过 auto **[TBD-BIZ]** | 未定不在 UI 承诺「自动仍开」或「自动必关」 |
+| EX-12.4 | 〔二期〕关闸或闸未配置后 automatic 开查 | — | **阻断**（BR-042）：跳过 auto 并审计 | PG-012 说明「同时阻断自动开查」；SRE 在告警详情可见跳过原因（与并发上限同类 L3，文案区分「组织闸」） |
 
 ---
 
@@ -651,6 +652,8 @@ preview 必须含：集群 / namespace / 资源 / 当前与目标副本（scale�
 | IX-FB-08 | 〔二期〕`auto` 与 `human` 徽章可区分；自动 inconclusive 同样不得像已找到根因 | BR-032、BR-074 |
 | IX-FB-09 | 〔二期〕人批成功不得把卡片升级成「根因已修复」的 RCA 标题 | BR-088 |
 | IX-FB-10 | 〔二期〕Loki RelatedLink 与 Loki Citation 分区展示 | BR-034、BR-075 |
+| IX-FB-11 | 〔二期〕工具/LLM 已停且有 pending 人批：L1 必须为「只读调查已结束，等待确认写操作」；禁止「正在分析 / 正在调查」 | BR-090 |
+| IX-FB-12 | 无 LLM 调查：横幅「AI 不可用，本次只收集只读证据，不会生成根因结论」；终态按 inconclusive 渲染 | BR-053 |
 
 ### 3.3 确认与撤销（IX-CNF）
 
@@ -691,8 +694,9 @@ preview 必须含：集群 / namespace / 资源 / 当前与目标副本（scale�
 | IX-PERM-09 | 〔二期〕开发 confirm 写 | 仅 `non_production` 且 namespace ∈ 绑定；否则无确认或 No Permission | BR-083 |
 | IX-PERM-10 | 〔二期〕开发 Loki | 无 namespace 则不能跑；UI 不提供去约束开关 | BR-076 |
 | IX-PERM-11 | 〔二期〕写工具默认 | 关写修复或无 WriteIdentity = 整块不出现 | BR-081 |
+| IX-PERM-12 | 他人 / auto 调查 | 能见该 Alert 则可只读打开其下全部 Investigation | BR-055 |
 
-跨用户查看他人 Investigation **[TBD-BIZ]**。未定前 **[ASSUMPTION]**：能见该 Alert 则可只读其下调查（含 auto）。
+跨用户查看他人 Investigation：已拍板（BR-055）。不可见 Alert 的调查 URL → No Permission。
 
 ---
 
@@ -742,8 +746,9 @@ preview 必须含：集群 / namespace / 资源 / 当前与目标副本（scale�
 | 业务状态 | 主标题约束 | 主内容 |
 |---|---|---|
 | `completed` | 「调查完成」类；可含引用条数 | 每条 Claim ≥1 Citation |
-| `inconclusive` | 禁止「根因是…」；原因：无引用 / 成本闸 | 可展示工具，L1 不像已找到根因 |
-| 〔二期〕`pending` 人批 | 从属于 running 调查，不单独当 RCA 完成 | preview + 确认 |
+| `inconclusive` | 禁止「根因是…」；原因：无引用 / 成本闸 / 无 LLM 只收集证据 | 可展示工具，L1 不像已找到根因 |
+| 〔二期〕`running` + 人批等待 | 「只读调查已结束，等待确认写操作」 | preview + 确认；墙钟显示已停止 |
+| 〔二期〕`pending` 人批 | 从属于上述 running，不单独当 RCA 完成 | preview + 确认 |
 | 〔二期〕`void` | 「调查已结束，未执行」 | 确认不可点 |
 
 `running` 用 Default + Loading 片段，不用 Success-Failure。
@@ -801,12 +806,12 @@ preview 必须含：集群 / namespace / 资源 / 当前与目标副本（scale�
 | PG-003 | BR-017、BR-022、BR-026、BR-050 | BR-070（只展示 severity，不开查） |
 | PG-004 | BR-051、BR-023 | — |
 | PG-005 | BR-030、BR-034、BR-044、BR-045、BR-051 | BR-070–BR-073 |
-| PG-006 | BR-031–BR-033、BR-038、BR-040、BR-043、BR-060 | BR-074–BR-076、BR-080–BR-089 |
+| PG-006 | BR-031–BR-033、BR-038、BR-040、BR-043、BR-053、BR-055、BR-060 | BR-074–BR-076、BR-080–BR-090 |
 | PG-007 / 008 | BR-027 | BR-078、BR-079 |
 | PG-009 | BR-004、BR-016、BR-046–BR-048 | BR-077、BR-081、BR-086、BR-087 |
 | PG-010 | BR-038、BR-039 | — |
 | PG-011 | BR-013–BR-015 | BR-076（无 namespace 则禁 Loki，仅提示） |
-| PG-012 | BR-041、BR-042 | BR-073（自动不计入 30） |
+| PG-012 | BR-041、BR-042、BR-054 | BR-073（自动不计入 30）；BR-042 阻断 auto |
 
 ### 6.2 任务流 → 异常一一对应
 
@@ -816,8 +821,8 @@ preview 必须含：集群 / namespace / 资源 / 当前与目标副本（scale�
 | TF-02 | 一期 | BR-011 | EX-02.1–02.3 |
 | TF-03 | 一期 | BR-051、§2.4 | EX-03.1–03.4 |
 | TF-04 | 一期 | BR-017、BR-026 | EX-04.1–04.4 |
-| TF-05 | 一期 | BR-030、BR-041、BR-042 | EX-05.1–05.7 |
-| TF-06 | 一期 | BR-031、BR-032、BR-040 | EX-06.1–06.8 |
+| TF-05 | 一期 | BR-030、BR-041、BR-042、BR-053、BR-054 | EX-05.1–05.7 |
+| TF-06 | 一期 | BR-031、BR-032、BR-040、BR-090 | EX-06.1–06.9 |
 | TF-07 | 一期 | BR-027 | EX-07.1–07.4 |
 | TF-08 | 一期 | BR-034 | EX-08.1–08.3 |
 | TF-09 | 一期 | §4 配置 | EX-09.1–09.5 |
@@ -837,12 +842,9 @@ preview 必须含：集群 / namespace / 资源 / 当前与目标副本（scale�
 | 标记 | 议题 | 卡在哪 |
 |---|---|---|
 | [TBD-BIZ] | IdP 产品名 | BR-010 |
-| [TBD-BIZ] | 无 LLM 时「调查」禁用还是只跑工具 | G3 vs BR-030 |
-| [TBD-BIZ] | 人点并发 5 是否硬拒绝 | NFR-011 |
 | [TBD-BIZ] | 开发空绑定是否允许登录 | BR-014 |
-| [TBD-BIZ] | 跨用户是否可看他人 Investigation | 未写 ACL |
-| [TBD-BIZ] | 日额拒绝是否占用次数；临时放行额度与时限 | BR-041 |
-| [TBD-BIZ] | 组织日 token 默认数字；关闸是否阻断 auto | BR-042、BR-070 |
+| [TBD-BIZ] | 临时放行额度与时限 | BR-041 |
+| [TBD-BIZ] | 组织日 token 默认数字；pending 人批等待超时秒数 | BR-042、BR-090 |
 | [TBD-BIZ] | 脱敏字段清单、截断字节、`scale_max` 整数 | BR-049、BR-043、BR-084 |
 | [TBD-BIZ] | Skill Git 地址；IngestCredential 展示 | BR-039、BR-016 |
 | [TBD-BIZ] | RelatedLink 删除与 host 允许列表 | BR-034 |
@@ -852,7 +854,7 @@ preview 必须含：集群 / namespace / 资源 / 当前与目标副本（scale�
 | [TBD-BIZ] | 调查结束后「继续查」是否仍可用 | BR-089 vs BR-040 |
 | [TBD-FE] | 深链 URL path | BR-051 |
 | [ASSUMPTION] | 创建后不可取消调查 | 无取消 BR |
-| [ASSUMPTION] | 能见 Alert 则只读其调查（含 auto） | — |
+| [ASSUMPTION] | 自然日界 `Asia/Shanghai` | BR-041 |
 | [ASSUMPTION] | 集群已有 running 扫描则禁用再发起 | — |
 | [ASSUMPTION] | 一期设置页不做表内搜索 | 20 人规模 |
 | [ASSUMPTION] | 仅 `running` 可「继续查」 | 见上 TBD |
@@ -872,3 +874,4 @@ preview 必须含：集群 / namespace / 资源 / 当前与目标副本（scale�
 - [x] `severity` 仅精确 `critical` 才表现自动开查；缺键 fail-close
 - [x] 写修复仅 preview 后第二次 confirm；写结果不是 Citation
 - [x] 每个核心交互可追溯至 BR-xxx / NFR / §4
+- [x] 2026-09-14：无 LLM 只跑工具；人点并发不硬拒绝；拒绝不占日额；关闸阻断 auto；能见 Alert 可读他人调查；人批等待 L1 文案锁定

@@ -93,9 +93,9 @@ flowchart TD
 | 项 | 内容 |
 |---|---|
 | 输入 | 已入库 Alert 的 id；当前 OIDC 用户；该用户团队绑定 |
-| 处理 | 鉴权 → 日额度 → 建调查 → 拉 Skill → 只读工具 → 脱敏 → LLM → 服务端铸造 citation |
-| 输出 | `completed`（断言全部带 citation）或 `inconclusive`（零 citation 或成本闸，BR-031、BR-040） |
-| 异常 | 不可见告警 → 拒绝；日额度满 → 拒绝新开（SRE 可临时放行，BR-041）；工具失败 → 该次 tool 无 citation，不得用失败结果冒充证据；墙钟 150s 到 → 停，标 `inconclusive`（成本） |
+| 处理 | 鉴权 → 日额度 → 建调查 → 拉 Skill → 只读工具 →（有 LLM 时）脱敏 → LLM → 服务端铸造 citation。无 LLM / 禁出域时跳过 LLM，只跑工具（BR-053） |
+| 输出 | `completed`（断言全部带 citation）或 `inconclusive`（零 citation、无 LLM 因而无 Claim、或成本闸，BR-031、BR-040、BR-053） |
+| 异常 | 不可见告警 → 拒绝；日额度满 → 拒绝新开且**不占次数**（SRE 可临时放行，BR-041）；人点并发超过 NFR-011 规划值 **不拒绝**（BR-054）；工具失败 → 该次 tool 无 citation，不得用失败结果冒充证据；墙钟 150s 到 → 停，标 `inconclusive`（成本；墙钟定义见 BR-040） |
 | 不做 | **一期**入库不自动开调查；HuntAI 不 page；不写 AM / xMatters。**二期**自动开查见 §2.5；写修复见 §2.6 |
 
 ### 2.3 SRE 按需规则扫描（AI-Free）
@@ -347,6 +347,10 @@ stateDiagram-v2
 
 `completed` 与 `inconclusive` 在界面上必须可区分。`inconclusive` 不得使用「根因是…」作为主标题。模型不得把 Investigation 标为 `completed` 当 Citation 数为 0。`trigger=auto` 的 Investigation 不因「无登录用户」而跳过 citation 规则。
 
+能列出或打开某 Alert 的用户，可只读该 Alert 下全部 Investigation（含他人发起与 `trigger=auto`）（BR-055）。
+
+〔二期〕LLM+工具循环已停、但仍有 `pending` ApprovalRequest 时，主状态保持 `running`（BR-090）。界面不得表现为「仍在分析」，见交互 PG-006。
+
 ### 5.3 ScanRun
 
 ```mermaid
@@ -437,9 +441,9 @@ stateDiagram-v2
 
 | 编号 | 规则 |
 |---|---|
-| BR-040 | 单次 Investigation：LLM 调用 ≤ 8，只读工具调用 ≤ 12，墙钟 ≤ 150 秒。任一超限必须停止，状态 `inconclusive`（成本），不得标 `completed`。 |
-| BR-041 | 同一 User 每个自然日最多新建 30 个 Investigation。超过后拒绝新开。SRE 与 break-glass 可对指定用户做临时放行，并写 AuditEvent。 |
-| BR-042 | 组织日 token 硬闸必须可配置、可关闭新调查。默认数字 **[TBD-BIZ]**，未配置时不得假装「无限」。实现必须有「闸存在」的开关位。 |
+| BR-040 | 单次 Investigation：LLM 调用 ≤ 8，只读工具调用 ≤ 12，墙钟 ≤ 150 秒。墙钟**只计** LLM 与只读工具执行；`pending` ApprovalRequest 等待期间不计入墙钟、调查保持 `running`（BR-090）。任一超限必须停止工具/LLM 循环，状态在无 pending 审批时为 `inconclusive`（成本），不得标 `completed`。pending 等待超时秒数 **[TBD-BIZ]**。 |
+| BR-041 | 同一 User 每个自然日最多**成功新建** 30 个 `trigger=human` 的 Investigation。超过后拒绝新开。因额度满、组织闸、权限失败或创建接口失败而拒绝的，**不增加**当日计数。SRE 与 break-glass 可对指定用户做临时放行，并写 AuditEvent。放行额度与时限 **[TBD-BIZ]**，禁止填造「+10 次 / 24h」。自然日界 **[ASSUMPTION]** `Asia/Shanghai`。 |
+| BR-042 | 组织日 token 硬闸必须可配置、可关闭新调查。默认数字 **[TBD-BIZ]**，未配置时不得假装「无限」。实现必须有「闸存在」的开关位。关闭新调查或闸未配置时：**同时阻断** `trigger=auto`（跳过自动开查并写 AuditEvent，Alert 仍入库）。 |
 | BR-043 | 单次工具返回超出上下文预算时必须截断或落盘；Citation 指向截断后的存储副本，禁止把未截断超大原文整包送入 LLM。截断阈值字节数 **[TBD-BIZ]**。 |
 | BR-044 | HuntAI **始终**禁止：对 Alertmanager 创建 silence；对 xMatters 事件 ack / 关单 / 评论；发起呼叫或升级；发送 IM；发送出站邮件；kubectl delete / apply / exec。**一期**另禁止 restart / scale。**二期** restart / scale 仅经 BR-080。 |
 | BR-045 | 允许 HuntAI 仅在本库记录「该用户看过该 Alert」作为 AuditEvent。该记录不得同步到 Alertmanager 或 xMatters。 |
@@ -455,6 +459,9 @@ stateDiagram-v2
 | BR-050 | 无 LLM 时 BR-026 与 BR-027 必须仍可执行（规则 finding 与告警列表不依赖模型）。 |
 | BR-051 | HuntAI 必须提供稳定深链：用 `cluster_id` 与 fingerprint 打开 Alert。未入库时页面文案为「尚未收到 AM webhook」，不得伪造 Alert。 |
 | BR-052 | 密钥、token、未脱敏原文禁止写入调查保留库、Citation 副本、应用日志。 |
+| BR-053 | 无可用 LLM（无 Key、禁止出域、或清单未定不得出域）时，对可见 Alert 点「调查」仍须创建 Investigation 并只跑只读工具；LLM 调用次数为 0。不得标 `completed`，不得在界面声称已找到根因。无 Claim 时终态为 `inconclusive`。 |
+| BR-054 | NFR-011 的「一期同时 5 个人点 running」是容量规划目标，**不是**创建准入硬闸。超过 5 仍允许新开人工调查。自动开查并发仍受 NFR-017 / BR-072 硬闸。 |
+| BR-055 | 能列出或打开某 Alert 的用户，可只读该 Alert 下全部 Investigation（含他人发起与 `trigger=auto`）。对不可见 Alert 不得通过调查 URL 读取其内容。 |
 
 ### 6.8 保留
 
@@ -470,7 +477,7 @@ stateDiagram-v2
 
 | 编号 | 规则 |
 |---|---|
-| BR-070 | 仅当 Alert 处于 firing 且标签键 `severity` 的值**精确等于** `critical` 时，系统可以创建 `trigger=auto` 的 Investigation。缺键、空值、其它值（含 `Critical`、`CRITICAL`、`warning`）一律不自动开查。生产与非生产集群同一规则。不得把缺键解释成全开。 |
+| BR-070 | 仅当 Alert 处于 firing 且标签键 `severity` 的值**精确等于** `critical` 时，系统可以创建 `trigger=auto` 的 Investigation。缺键、空值、其它值（含 `Critical`、`CRITICAL`、`warning`）一律不自动开查。生产与非生产集群同一规则。不得把缺键解释成全开。组织已关闭新调查或日 token 闸未配置时不得自动开查（BR-042）。 |
 | BR-071 | 同一 fingerprint 在同一次 firing 期间（直至 resolved）最多 1 个 `trigger=auto` 的 Investigation。resolved 之后再次 firing 才允许再自动开一次。重复 firing webhook 不得再开。 |
 | BR-072 | 全组织同时 `running` 且 `trigger=auto` 的 Investigation 个数 ≤ 5。达到上限则跳过本次自动开查，Alert 仍入库，必须写 AuditEvent（原因：自动开查并发上限）。不排队补开。 |
 | BR-073 | 自动开查的发起人是 SystemPrincipal `auto-investigator`，不计入任何 User 的每日 30 次（BR-041）。人随后打开该 Investigation 继续查，不改发起人。`auto-investigator` 不可登录、不可 confirm WriteAction。 |
@@ -490,6 +497,7 @@ stateDiagram-v2
 | BR-087 | 每个 ClusterSource 必填 `env`：`production` 或 `non_production`。未填视为 `production`。禁止用集群名称字符串推断环境。 |
 | BR-088 | 写操作执行结果不得作为 Claim 的 Citation。 |
 | BR-089 | 禁止独立对话首页、无 `alert_id` 的 Ask、无入参 `diagnose()`、上传 txt/md 向量库。调查页内对同一 Investigation 的「继续查」仍绑定原 Alert，不算独立对话产品。 |
+| BR-090 | 调查图的 LLM 与只读工具循环结束后，若仍存在 `pending` ApprovalRequest，Investigation 主状态保持 `running`，直到全部 pending 变为 confirmed / rejected / void，或等待超时（秒数 **[TBD-BIZ]**，到点 void）。界面必须表明只读调查已停、正在等人确认写操作，禁止继续用「正在分析 / 正在调查」作 L1。 |
 
 ---
 
@@ -513,7 +521,7 @@ stateDiagram-v2
 | 编号 | 指标 | 量化 |
 |---|---|---|
 | NFR-010 | 注册账号 | 一期 20；结构按 1000 设计 |
-| NFR-011 | 同时进行的人点 Investigation（状态 `running`） | 一期 5；结构按 50 设计。自动开查另计 NFR-017 |
+| NFR-011 | 同时进行的人点 Investigation（状态 `running`） | 一期按 5、结构按 50 **规划容量**；**不作为**创建硬闸（BR-054）。自动开查另计 NFR-017（硬闸） |
 | NFR-012 | 每用户每自然日新建 Investigation | ≤ 30（BR-041） |
 | NFR-013 | Kubernetes 集群数 | 一期 2 至 5；每集群 1 套 Prometheus + 1 套 Alertmanager |
 | NFR-014 | 告警 webhook 峰值（条 / 分钟，全组织合计） | **[TBD-BIZ]**；未填写前不得用「能抗风暴」代替数字 |
@@ -630,7 +638,7 @@ stateDiagram-v2
 
 ## 10. 完成前自检
 
-- [x] 每条 BR 有唯一编号且无歧义（一期 BR-001–BR-062 空隙保留；二期 BR-070–BR-089）
+- [x] 每条 BR 有唯一编号且无歧义（一期 BR-001–BR-062 空隙保留，2026-09-14 补 BR-053–055；二期 BR-070–BR-090）
 - [x] 每条 NFR 有量化指标（含明确 **[TBD-BIZ]** 的待填数字，无「高性能 / 高可用」表述）
 - [x] Out of Scope 40 项 ≥ MVP 20 项的一半
 - [x] 一期 §8 仍为 20 项，未被二期改写
