@@ -10,7 +10,7 @@
 |---|---|
 | 命名 / Git / 验证命令 / 红线 | `docs/00_setup/project_rules.md` |
 | 目录职责与阶段产出 | 本文 §1–§4；各 `docs/NN_*/README.md` |
-| 技术栈推荐（未冻结） | 根 `README.md`「技术栈决策」 |
+| 技术栈（已冻结） | `docs/06_architecture_design/tech_stack.md`（ADR-0008）；根 `README.md` 为摘要 |
 | 改已有结论或冻结资产 | 先写 `docs/13_changes/change_log.md` |
 
 ## 1. 目录职责边界
@@ -37,7 +37,7 @@ docs/       全部设计资产与过程文档的唯一存放地。禁止放可�
 - 运行时依赖新增顺序：用户批准 → 审计（维护活跃度 / License / 无未修复通告）→ `uv add` 或 `npm install` 落锁。禁止 AI 自行引入。
 - 密钥、生产数据、真实 PII 禁止写入仓库、日志、示例、Prompt。需要 AI 协助时只用脱敏或合成样例。
 
-版本锁定与「不采纳清单」在 Stage 6 产出后以该阶段文档为准；在此之前以根 `README.md` 的推荐组合为工作假设，并逐条保留 `[ASSUMPTION]` / `[TBD-*]`。
+版本锁定与「不采纳清单」以 [`docs/06_architecture_design/tech_stack.md`](docs/06_architecture_design/tech_stack.md)（ADR-0008）为准。未写入该文的运行时依赖禁止在 Stage 11 自行引入。
 
 ## 3. 阶段约定输出（路径 + 格式）
 

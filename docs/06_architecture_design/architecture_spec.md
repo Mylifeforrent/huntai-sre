@@ -7,7 +7,7 @@
 - **原型**: `05_prototype` 无链接/截图，不阻塞、不补造。
 - **非目标**: 实现代码、迁移、编排、Stage 7 OpenAPI、前端视觉规范。
 
-专题正文：[`01_domain_and_service_architecture.md`](./01_domain_and_service_architecture.md) · [`02_api_workflow_and_review.md`](./02_api_workflow_and_review.md) · [`03_security_reliability_and_operations.md`](./03_security_reliability_and_operations.md) · [`04_architecture_review.md`](./04_architecture_review.md) · 边界 [`frontend_backend_boundary_spec-v1.0.md`](./frontend_backend_boundary_spec-v1.0.md)
+专题正文：[`01_domain_and_service_architecture.md`](./01_domain_and_service_architecture.md) · [`02_api_workflow_and_review.md`](./02_api_workflow_and_review.md) · [`03_security_reliability_and_operations.md`](./03_security_reliability_and_operations.md) · [`04_architecture_review.md`](./04_architecture_review.md) · 边界 [`frontend_backend_boundary_spec-v1.0.md`](./frontend_backend_boundary_spec-v1.0.md) · **技术栈冻结** [`tech_stack.md`](./tech_stack.md)（ADR-0008 Accepted）
 
 ---
 
@@ -33,7 +33,7 @@
 | A02 | 无取消调查；能见 Alert 则可只读其调查 | 需改读 ACL 与 API |
 | A03 | 同集群 running 扫描互斥 | 放开并行 ScanRun |
 | A06 | 150s 只计 LLM+工具；pending 不耗墙钟、调查保持 running | 二期人批窗口失效或须改 BR（走 change_log） |
-| 栈 | FastAPI + worker + PostgreSQL + 调查图用 LangGraph | ADR-0001/0002/0005 |
+| 栈 | FastAPI + worker + PostgreSQL + 调查图用 LangGraph；版本见 `tech_stack.md` | ADR-0001/0002/0005/**0008 Accepted** |
 
 冲突处置：C1/C2 已按用户「按推荐执行」落盘；C3 用 A06 解释墙钟，不改 BR 正文；C4 `ALERT_WEBHOOK_URL` 不接入产品。
 
@@ -109,7 +109,7 @@ xMatters ──仅运营深链 URL──► 浏览器 ──► API
 - 数据：PostgreSQL（ADR-0005）；保留 90/365 天；无清单不出域。
 - 可靠性：有界闸 + 幂等 webhook + worker 崩溃不得标 completed；不宣称高可用。
 - 可观测：结构化日志（禁密钥与未脱敏原文）；Sentry 可选且须脱敏；产品不用 `ALERT_WEBHOOK_URL`。
-- 运维：根 `.env`；Stage 12 再写编排；多副本锁 `[TBD-INFRA]`。
+- 运维：根 `.env`；Stage 12 写 compose（api / worker / postgres），一期不上 Kubernetes；多副本锁仍 `[TBD-INFRA]`。技术栈版本见 [`tech_stack.md`](./tech_stack.md)。
 
 ---
 
@@ -136,8 +136,9 @@ xMatters ──仅运营深链 URL──► 浏览器 ──► API
 | [0005](./adr/0005_postgresql_persistence.md) | PostgreSQL | SQLite |
 | [0006](./adr/0006_phase1_slice_phase2_boundaries.md) | 一期关二期能力 | 只设计一期 |
 | [0007](./adr/0007_investigation_progress_polling.md) | GET 轮询 | 仅 SSE |
+| [0008](./adr/0008_tech_stack.md) | 实现技术栈与版本 | Next.js / Redis / TS7 / K8s 一期 |
 
-全部 Proposed，待维护人接受后才可当冻结。
+0001–0007 仍为 Proposed（系统架构 Draft）。**0008 已 Accepted**：仅冻结实现技术栈，不把整份架构升格为已批准。
 
 ---
 
@@ -166,7 +167,7 @@ xMatters ──仅运营深链 URL──► 浏览器 ──► API
 3. 组织日 token 默认数字；pending 人批等待超时秒数。
 4. 脱敏清单、截断字节、出域网关地址、Skill Git、`scale_max`。
 5. 开发深链探测（404 vs 403）；开发空绑定是否允许登录。
-6. 证据对象存储 vs 仅库内；webhook 认证算法；多 worker 队列。
+6. 证据对象存储 vs 仅库内；webhook 认证算法。（一期 **不** 上外部 worker 队列，ADR-0008）
 7. SSE 是否进入一期。
 
 ---
@@ -182,3 +183,21 @@ xMatters ──仅运营深链 URL──► 浏览器 ──► API
 - [ ] 用户接受 ADR 后：改 Status 须 change_log + 显式批准。
 
 下一步合法阶段：Stage 7 数据模型与 API 契约；**不是** Stage 11 编码。
+
+---
+
+## 13. 技术栈冻结（ADR-0008 Accepted）
+
+权威正文：[`tech_stack.md`](./tech_stack.md)。系统架构其余章节仍为 Draft。
+
+| 项 | 冻结 |
+|---|---|
+| 前端 | React 19 + TypeScript 6 + Vite 8 SPA + react-router |
+| UI | Tailwind CSS 4 + shadcn/ui 源码内置 |
+| 状态 | TanStack Query + Zustand |
+| 后端 | CPython 3.13 + FastAPI + uvicorn + uv |
+| ORM | SQLAlchemy 2.0 async + Alembic + psycopg 3（唯一驱动） |
+| API | REST JSON `/api/v1/`；进度 GET 轮询 |
+| 调查图 | LangGraph 库内嵌 worker；PostgreSQL checkpointer |
+| 测试 | pytest / Vitest + RTL；一期无 Playwright |
+| 部署 | Vite 静态资源由 FastAPI 同源托管；Stage 12 compose（api / worker / postgres）；一期无 Kubernetes |

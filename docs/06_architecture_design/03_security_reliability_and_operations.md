@@ -126,7 +126,7 @@ LangGraph 生产 checkpointer 若启用必须落 PostgreSQL，避免进程重启
 - 配置唯一入口：仓库根 `.env`（`AGENTS.md`）。代码不硬编码。
 - 已部署实例使用每集群只读 SA，禁止个人 kubeconfig（MVP-14）。
 - Stage 12 才允许顶层 `docker-compose.yml` / `.github/`。本阶段不写编排文件。
-- E2E 与 K8s 部署形态 `[TBD-INFRA]`。
+- 编排形态已冻结（ADR-0008）：compose 三服务 api / worker / postgres；一期 **不上** Kubernetes。Playwright E2E 不进一期（产品永不做 Playwright；CI E2E 留 Stage 12 再议）。
 
 ### 6.3 成本
 

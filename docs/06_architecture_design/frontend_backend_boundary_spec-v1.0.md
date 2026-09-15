@@ -20,7 +20,7 @@
 | 写修复（二期） | 后端 ApprovalRequest | 展示 preview、第二次 confirm | 模型或前端直接调写接口 |
 | 集群凭证 | 后端 / secret | 显示已配置/未配置 | 上传 kubeconfig、回显密钥 |
 
-渲染在浏览器（Vite SPA 为 README 假设）；服务端只有 FastAPI。前端不持有集群 SA。
+渲染在浏览器（Vite SPA，ADR-0008 / [`tech_stack.md`](./tech_stack.md) 已冻结）；服务端只有 FastAPI。前端不持有集群 SA。
 
 ---
 

@@ -18,4 +18,4 @@
 
 ## 后果
 
-Stage 11 初始化依赖用户批准后 `uv add`。版本号 Stage 6 未锁，保持 `[TBD-INFRA]`。
+Stage 11 初始化依赖用户批准后 `uv add`。运行时 PostgreSQL **18.x 最低 18.6**、SQLAlchemy 2.0.53、Alembic 1.20.0、驱动仅 psycopg 3.3.5，见 ADR-0008 / `tech_stack.md`。对象存储仍 `[TBD-INFRA]`。

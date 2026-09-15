@@ -15,7 +15,7 @@
 | 内部前身 SuperBizAgent（FastAPI + LangGraph Demo） | 研究输入 | 研究库 `competitors/sre-agent-analysis/super-biz-agent/`；禁止当作本仓库已实现能力 |
 | 目标客户栈、出域合规、IRM vs 纯调查切面 | **[TBD-BIZ]** | 仓库维护人于 Stage 3 调研与 Stage 8 PRD 确认 |
 | 身份方案（OIDC / 其他） | **[TBD-BIZ]** + **[TBD-INFRA]** | 仓库维护人于 Stage 6 架构确认 |
-| 运行时精确版本（Python / Node / PostgreSQL） | **[TBD-INFRA]** | 仓库维护人于 Stage 6 冻结、Stage 11 锁文件落地 |
+| 运行时精确版本（Python / Node / PostgreSQL） | **已冻结** | [`docs/06_architecture_design/tech_stack.md`](docs/06_architecture_design/tech_stack.md)（ADR-0008）。Stage 11 写入锁文件 |
 
 本仓库已生效的工程基线（Stage 1）：`.gitignore`、`.env.example`（仅键名）、pre-commit + gitleaks、LangChain 文档 MCP（`.mcp.json` 与 `.cursor/mcp.json`）。
 
@@ -50,29 +50,29 @@ huntai-sre/
 
 ## 技术栈决策
 
-选型原则：**单人项目没有团队缓冲去消化新栈的学习与踩坑成本**，因此选择「本人已在同系列仓库用过、生态与 AI 语料足够、能独立运维」的组合，而不是当前最流行的栈。此处只定**推荐组合**，不锁版本；版本在 Stage 6 架构冻结、Stage 11 初始化代码时写入锁文件。
+选型原则：**单人项目没有团队缓冲去消化新栈的学习与踩坑成本**，因此选择「本人已在同系列仓库用过、生态与 AI 语料足够、能独立运维」的组合，而不是当前最流行的栈。
 
-下列组合是 **[ASSUMPTION]**（依据：同系列 `huntai-test` 工程约定、本仓库已接 LangChain MCP、`.env.example` 已预留 PostgreSQL / Sentry、内部前身 SuperBizAgent 为 FastAPI + LangGraph）。未在 Stage 6 写成 Accepted ADR 之前，禁止当已冻结事实引入实现。
+**已冻结**（2026-09-15，ADR-0008）：版本、License、维护活跃度、高危 CVE 审计见 [`docs/06_architecture_design/tech_stack.md`](docs/06_architecture_design/tech_stack.md)。Stage 11 才写入 `uv.lock` / `package-lock.json`。升 minor/major 须 change_log + 显式批准。
 
-### 后端：Python 3.12+ · FastAPI · uv · SQLAlchemy 2.0 · PostgreSQL
+### 后端：Python 3.13 · FastAPI · uv · SQLAlchemy 2.0 · PostgreSQL 18
 
 | 选择 | 理由 |
 |---|---|
-| Python 3.12+ | 个人主力语言；LangChain / LangGraph 生态第一语言；与 uv 配套 |
-| FastAPI | 原生 async，SSE 适合调查过程流式输出；Pydantic v2 校验 + OpenAPI 作前后端契约；内部前身同栈 |
+| Python 3.13 | 个人主力语言；LangChain / LangGraph 生态第一语言；与 uv 配套。3.12 已 security-only，不锁 3.14 新 feature 系列 |
+| FastAPI + uvicorn | 原生 async；Pydantic v2 校验 + OpenAPI 作前后端契约；内部前身同栈 |
 | uv | 虚拟环境与依赖一体化；`uv.lock` 可复现；已写入 `AGENTS.md` 与 `project_rules.md` |
-| Pydantic Settings | 以仓库根 `.env` 为唯一配置入口，与安全基线配套 |
-| SQLAlchemy 2.0（async）+ Alembic + PostgreSQL | `.env.example` 已预留 `POSTGRES_PASSWORD`；禁止用 SQLite 承担审批 / 审计 / 恢复（**[ASSUMPTION]**，Stage 6 确认） |
-| LangGraph（调查图，非业务控制面） | 本仓库已接 LangChain 官方文档 MCP；前身用 LangGraph 做 Plan-Execute-Replan。控制面与 Agent 边界 **[TBD-INFRA]**：由仓库维护人于 Stage 6 用 ADR 裁定。禁止把模型当作权限 / 审批 / 重试 / 幂等的决策者 |
+| Pydantic Settings | 以仓库根 `.env` 为唯一配置入口 |
+| SQLAlchemy 2.0（async）+ Alembic + psycopg 3 + PostgreSQL 18（≥18.6） | 审批 / 审计 / 配额 / 恢复禁止 SQLite（ADR-0005）。只保留一个驱动，供控制面与 LangGraph checkpointer 共用 |
+| LangGraph（调查图，非业务控制面） | 有界只读工具循环。控制面仍在 FastAPI（ADR-0002）。禁止把模型当作权限 / 审批 / 重试 / 幂等的决策者 |
 
-### 前端：React · TypeScript · Vite · Tailwind CSS · shadcn/ui
+### 前端：React 19 · TypeScript 6 · Vite 8 · Tailwind CSS 4 · shadcn/ui
 
 | 选择 | 理由 |
 |---|---|
-| React + TypeScript | 个人最熟练，社区语料充分，AI 生成与排错效率最高 |
-| Vite（纯 SPA） | 前后端分离边界干净：渲染在客户端，服务端只有 FastAPI；避免 Next.js SSR 与 Python 后端职责重叠 |
-| Tailwind CSS + shadcn/ui（源码内置） | 组件源码进仓库而非黑盒 npm 包，适合单人改调查时间线 / 审批卡 |
-| TanStack Query + Zustand | 服务端状态与本地 UI 状态分开，不引入 Redux |
+| React 19 + TypeScript 6 | 个人最熟练。不采用 TypeScript 7：无稳定 compiler API，eslint 不兼容 |
+| Vite 8 纯 SPA | 前后端分离：渲染在客户端，服务端只有 FastAPI；静态资源由 FastAPI 同源托管 |
+| Tailwind CSS 4 + shadcn/ui（源码内置） | 组件源码进仓库而非黑盒 npm 包，适合单人改调查时间线 / 审批卡 |
+| TanStack Query + Zustand | 服务端状态（含调查进度轮询）与本地 UI 状态分开，不引入 Redux |
 
 ### 质量工具链（Stage 11 随代码初始化落地）
 
@@ -80,7 +80,7 @@ huntai-sre/
 - 前端门禁：ESLint / `tsc --noEmit` / `npm run build` / Vitest
 - 提交门禁：pre-commit + gitleaks（已配置）
 
-E2E（Playwright）与部署形态（compose → Kubernetes）**[TBD-INFRA]**，Stage 12 确认。
+一期测试框架即 pytest 与 Vitest + React Testing Library。**不**引入 Playwright。发布形态：Stage 12 `docker-compose.yml`（api + worker + postgres）；一期不上 Kubernetes。
 
 ## 关键文档
 
@@ -104,7 +104,7 @@ E2E（Playwright）与部署形态（compose → Kubernetes）**[TBD-INFRA]**，
 | 业务问题建模 | `docs/03_problem_modeling/` | 待启动 |
 | 核心交互链路设计 | `docs/04_interaction_design/` | 待启动 |
 | 产品原型规范 | `docs/05_prototype/` | 待启动 |
-| 系统架构设计 | `docs/06_architecture_design/` | 待启动 |
+| 系统架构设计 | `docs/06_architecture_design/` | 进行中（Draft 架构 + **技术栈已冻结** ADR-0008） |
 | 数据模型与 API 规范 | `docs/07_backend_design/` | 待启动 |
 | PRD | `docs/08_prd/` | 待启动 |
 | 高保真设计 | `docs/09_figma_highfi/` | 待启动 |

@@ -15,7 +15,7 @@
 | 路径 | 定位 | 本阶段用法 |
 |---|---|---|
 | `AGENTS.md`、`docs/00_setup/project_rules.md` | 目录职责、命名、红线、Stage 6 约定文件 | 工程约束；与当次指令的文件名冲突见 §4 C1 |
-| 根 `README.md` | 推荐栈、范围假设 | 仅作 `[ASSUMPTION]`，用 ADR 裁定 |
+| 根 `README.md` | 推荐栈（现已由 ADR-0008 冻结） | 历史输入；现行版本以 `tech_stack.md` 为准 |
 | `.env.example` | 已预留键 | 配置边界；`ALERT_WEBHOOK_URL` 见 C4 |
 | `.mcp.json`、`.cursor/mcp.json` | 编码助手用 LangChain **文档** MCP | 不是产品运行时 |
 | `docs/13_changes/change_log.md` | 二期增补已获批 | 二期边界合法进入架构，不进一期验收 |
@@ -47,7 +47,7 @@
 | F08 | 角色仅 SRE / 开发 on-call / 唯一 break-glass；开发不可见 `unscoped` | §4、BR-017、BR-022 | 授权按标签绑定；前端隐藏不是安全边界 |
 | F09 | 保留：调查/ToolCall/Citation/Alert 90 天；AuditEvent 365 天 | BR-060–062 | 到期删除作业 |
 | F10 | 页面 PG-001–012；TF-01–17；`completed` 与 `inconclusive` 必须可区分 | 交互全文 | API 状态枚举与页态一一映射 |
-| F11 | 推荐栈 FastAPI / uv / PostgreSQL / React **未写成 Accepted ADR** | 根 README | 本阶段 ADR 裁定工作假设，仍为 Draft |
+| F11 | 实现技术栈已冻结：FastAPI / uv / PostgreSQL 18 / React 19 / Vite 8 | ADR-0008 Accepted；[`tech_stack.md`](./tech_stack.md) | 版本与 CVE 审计见该文；系统架构其余部分仍 Draft |
 
 ### 2.2 假设（不得升格为已批准产品结论）
 
